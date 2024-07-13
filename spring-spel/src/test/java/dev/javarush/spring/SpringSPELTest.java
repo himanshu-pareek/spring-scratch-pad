@@ -2,6 +2,8 @@ package dev.javarush.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -10,12 +12,17 @@ import java.util.GregorianCalendar;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.SpelCompilerMode;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
+
+import dev.javarush.springspel.NumberGuess;
+import dev.javarush.springspel.TaxCalculator;
 
 public class SpringSPELTest {
 
@@ -120,5 +127,37 @@ public class SpringSPELTest {
 
         assertEquals(10, demo.list.size());
         assertEquals("My String", demo.list.get(9));
+    }
+
+    @Test
+    public void testImmediateModeCompilation() {
+
+        record Message(String payload) {};
+
+        SpelParserConfiguration config = new SpelParserConfiguration(
+            SpelCompilerMode.IMMEDIATE,
+            this.getClass().getClassLoader()
+        );
+        SpelExpressionParser parser = new SpelExpressionParser(config);
+
+        Expression expression = parser.parseExpression("payload");
+
+        Message message = new Message("Hello, world🌍");
+        String payload = expression.getValue(message, String.class);
+        System.out.println ("Payload - " + payload);
+    }
+
+    @Test
+    public void textXMLConfiguration() {
+        System.setProperty("user.region", "IN");
+        var context = new ClassPathXmlApplicationContext("beans.xml");
+        NumberGuess numberGuess = context.getBean(NumberGuess.class);
+        assertNotNull(numberGuess.getRandomNumber());
+
+        TaxCalculator taxCalculator = context.getBean(TaxCalculator.class);
+        assertEquals("IN", taxCalculator.getDefaultLocale());
+        assertEquals(numberGuess.getRandomNumber(), taxCalculator.getInitialRate());
+
+        context.close();
     }
 }

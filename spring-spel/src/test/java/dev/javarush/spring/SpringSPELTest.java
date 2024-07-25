@@ -2,7 +2,6 @@ package dev.javarush.spring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -10,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -20,7 +20,9 @@ import org.springframework.expression.spel.SpelCompilerMode;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
+import org.springframework.expression.spel.support.StandardEvaluationContext;
 
+import dev.javarush.springspel.ListConcatenation;
 import dev.javarush.springspel.NumberGuess;
 import dev.javarush.springspel.TaxCalculator;
 
@@ -159,5 +161,91 @@ public class SpringSPELTest {
         assertEquals(numberGuess.getRandomNumber(), taxCalculator.getInitialRate());
 
         context.close();
+    }
+
+    @Test
+    public void testCreateList() {
+        SpelExpressionParser parser = new SpelExpressionParser();
+        List numbers = parser.parseExpression ("{ 1, 2, 3, 4 }").getValue(List.class);
+        System.out.println(numbers);
+        assertEquals(4, numbers.size());
+
+        List listOfLists = (List) parser.parseExpression("{{'a','b'},{'x','y'}}").getValue(List.class);
+        System.out.println(listOfLists);
+        assertEquals(2, listOfLists.size());
+    }
+
+    @Test
+    public void testInlineMap() {
+        SpelExpressionParser parser = new SpelExpressionParser();
+
+        // evaluates to a Java map containing the two entries
+        Map inventorInfo = parser.parseExpression("{name:'Nikola',dob:'10-July-1856'}").getValue(Map.class);
+
+        Map mapOfMaps = parser.parseExpression("{name:{first:'Nikola',last:'Tesla'},dob:{day:10,month:'July',year:1856}}").getValue(Map.class);
+
+        System.out.println(inventorInfo);
+        System.out.println(mapOfMaps);
+        assertEquals(2, inventorInfo.size());
+        assertEquals(2, mapOfMaps.size());
+    }
+
+    @Test
+    public void testOperatorOverloader() {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        context.setOperatorOverloader(new ListConcatenation());
+        SpelExpressionParser parser = new SpelExpressionParser();
+
+        List numbers = parser.parseExpression("{ 1, 2, 3 } + { 4, 5 }").getValue(context, List.class);
+        assertEquals(5, numbers.size());
+    }
+
+    @Test
+    public void testVariablesInEvaluationContext() {
+        class Inventor {
+            public String name;
+            public String country;
+
+            Inventor(String name, String country) {
+                this.name = name;
+                this.country = country;
+            }
+        }
+
+        var inventor = new Inventor("Nikola Tesla", "Siberian");
+        EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+        context.setVariable("newName", "Mike Tesla");
+
+        SpelExpressionParser parser = new SpelExpressionParser();
+        parser.parseExpression("name = #newName").getValue(context, inventor);
+        assertEquals("Mike Tesla", inventor.name);
+    }
+
+    @Test
+    public void testThisInExpression() {
+        List<Integer> primes = List.of(2, 3, 5, 7, 11, 13, 17);
+
+        ExpressionParser parser = new SpelExpressionParser();
+        EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+        context.setVariable("primes", primes);
+
+        String expression = "#primes.?[#this > 10]";
+        List<Integer> selectedPrimes = parser.parseExpression(expression).getValue(context, List.class);
+        assertEquals(3, selectedPrimes.size());
+    }
+
+    @Test
+    public void testThisAndRootInExpression() {
+        record Inventor(Integer id, String name, List<String> inventions) {}
+
+        ExpressionParser parser = new SpelExpressionParser();
+        EvaluationContext context = SimpleEvaluationContext.forReadWriteDataBinding().build();
+
+        var tesla = new Inventor(1, "Nikola Tesla", List.of("Telephone repeater", "Tesla coil transformer"));
+
+        String expression = "#root.inventions.![#root.name + ' invented the ' + #this + '.']";
+        List value = parser.parseExpression(expression).getValue(context, tesla, List.class);;
+        System.out.println(value);
+        assertEquals(2, value.size());
     }
 }

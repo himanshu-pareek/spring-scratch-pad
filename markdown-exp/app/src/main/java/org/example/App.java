@@ -1,6 +1,13 @@
 package org.example;
 
-import com.vladsch.flexmark.util.ast.Node;
+import com.vladsch.flexmark.util.ast.Document;
+
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+
 import com.vladsch.flexmark.html.HtmlRenderer;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -11,7 +18,7 @@ public class App {
     }
 
     public static void main(String[] args) {
-        System.out.println(new App().getGreeting());
+        // System.out.println(new App().getGreeting());
 
         markDownDemo();
     }
@@ -26,32 +33,20 @@ public class App {
         //options.set(HtmlRenderer.SOFT_BREAK, "<br />\n");
 
         Parser parser = Parser.builder(options).build();
-        HtmlRenderer renderer = HtmlRenderer.builder(options).build();
 
-        // You can re-use parser and renderer instances
-        String content = """
-                # Heading 1
+        try (
+            InputStream inputStream = ClassLoader.getSystemClassLoader().getResourceAsStream("sample.md");
+            InputStreamReader reader = new InputStreamReader(inputStream);
+            FileWriter fileWriter = new FileWriter("classpath:/sample.html");
 
-This is some content
-
-## Heading 1.1
-
-This is another contnet
-
-1. Item one
-2. Item two
-    * Item 2.something
-    * Item 2.something else
-
-```
-console.log('Hello, there');
-```
-
----
-
-                """;
-        Node document = parser.parse(content);
-        String html = renderer.render(document);  // "<p>This is <em>Sparta</em></p>\n"
-        System.out.println(html);
+        ) {
+            Document document = parser.parseReader(reader);
+            HtmlRenderer renderer = HtmlRenderer.builder(options).build();        
+            renderer.render(document, fileWriter);  // "<p>This is <em>Sparta</em></p>\n"
+        } catch (Exception e) {
+            System.err.println("Something went wront...");
+            System.err.println(e.getLocalizedMessage());
+            e.printStackTrace();
+        }
     }
 }
